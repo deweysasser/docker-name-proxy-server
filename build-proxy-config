@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Purpose:  configure NGINX
+
+set -e -u
+
+proxy() {
+    name=$1
+    forward=$2
+
+cat <<EOF
+server {
+   server_name $name;
+
+   location / {
+      proxy_pass http://$forward;
+      proxy_redirect default;
+   }
+}
+
+EOF
+}
+
+mainserver() {
+cat <<EOF
+server {
+   listen 80;
+}
+
+EOF
+}
+
+names=`env | awk -F= '/^__/{print $1}'`
+
+(
+set -u -e
+mainserver
+for name in $names; do
+    host=`echo $name | tr -d _`
+    forward=`eval echo \\$$name`
+    echo \# proxy for $host.$DOMAIN to $forward
+    proxy $host.$DOMAIN $forward
+done
+) > /etc/nginx/sites-enabled/proxy.conf
+
+(
+set -u -e
+echo "<ul>"
+for name in $names; do
+    host=`echo $name | tr -d _`
+    forward=`eval echo \\$$name`
+cat <<EOF
+<li><a href="http://$host.$DOMAIN">$host.$DOMAIN</a></li>
+EOF
+done
+echo "</ul>"
+) > /usr/share/nginx/html/index.html
+

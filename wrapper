@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Purpose:  configure NGINX
+
+`dirname $0`/build-proxy-config > /etc/nginx/sites-enabled/proxy.conf
+
+exec "$@"

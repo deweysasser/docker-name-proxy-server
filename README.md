@@ -1,30 +1,41 @@
-## Nginx Dockerfile
+# Name based proxy server
 
+This image is a named based proxy server.  By defining appropriate
+environment variables, you can have it do host name based mapping to
+foward to different server processes.
 
-This repository contains **Dockerfile** of [Nginx](http://nginx.org/) for [Docker](https://www.docker.com/)'s [automated build](https://registry.hub.docker.com/u/dockerfile/nginx/) published to the public [Docker Hub Registry](https://registry.hub.docker.com/).
+The design point is to multiplex a single port 80 to different
+back-end processes.
 
+This is what Apache Server calls "Named Virtual Hosts" and NGINX calls
+"server blocks".
 
-### Base Docker Image
+## Usage
 
-* [dockerfile/ubuntu](http://dockerfile.github.io/#/ubuntu)
+Using e.g. docker-compose, try something like this:
 
+     proxyserver:
+       build: .
+       ports:
+         - 80:80
+       links:
+         - webserver:service
+         - jenkins:build
+         - dashboard:dashboard
+       environment:
+         DOMAIN: example.com
+         __build: build:8080
+         __web: service:80
+         __dashboard: dashboard:5000
 
-### Installation
+This will have the proxy server listen on port 80, and when it is
+called as "build.example.com" (e.g. "curl build.example.com" it will
+forward traffic to the linked docker container referred to internally
+as 'build' on port 8080 (which is linked to a container named 'jenkins').
 
-1. Install [Docker](https://www.docker.com/).
+When called as "web.example.com", traffic will be forwarded to the
+linked docker container referred to as 'dashboard' on port 5000.
 
-2. Download [automated build](https://registry.hub.docker.com/u/dockerfile/nginx/) from public [Docker Hub Registry](https://registry.hub.docker.com/): `docker pull dockerfile/nginx`
+Note that this allows the implementation containers ports to remain
+unexposed on the host.
 
-   (alternatively, you can build an image from Dockerfile: `docker build -t="dockerfile/nginx" github.com/dockerfile/nginx`)
-
-
-### Usage
-
-    docker run -d -p 80:80 dockerfile/nginx
-
-#### Attach persistent/shared directories
-
-    docker run -d -p 80:80 -v <sites-enabled-dir>:/etc/nginx/conf.d -v <certs-dir>:/etc/nginx/certs -v <log-dir>:/var/log/nginx -v <html-dir>:/var/www/html dockerfile/nginx
-
-After few seconds, open `http://<host>` to see the welcome page.
-=======
