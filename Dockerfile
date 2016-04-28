@@ -7,32 +7,15 @@
 # Pull base image.
 FROM ubuntu:14.04
 
-RUN apt-get update && \
-   apt-get -y install curl && \
-   apt-get -y install software-properties-common
+RUN apt-get update && apt-get -y install curl python
+RUN curl https://get.docker.com | bash
 
-# Install Nginx.
-RUN \
-  add-apt-repository -y ppa:nginx/development && \
-  apt-get update && \
-  apt-get install -y nginx && \
-  rm -rf /var/lib/apt/lists/* && \
-  echo "\ndaemon off;" >> /etc/nginx/nginx.conf && \
-  chown -R www-data:www-data /var/lib/nginx
+RUN apt-get -y install python-pip
+RUN pip install docker-py
 
-# Define working directory.
-WORKDIR /etc/nginx
+ADD events.sh /root/watch
+ADD build-proxy-config.py /root/
+CMD ["/root/watch"]
+ENV DOMAIN=example.com
+VOLUME /etc/nginx/conf.d
 
-# Define default command.
-CMD ["nginx"]
-
-# Expose ports.
-EXPOSE 80
-EXPOSE 443
-
-
-RUN rm sites-enabled/default
-ADD wrapper /root/
-ADD build-proxy-config /root/
-
-ENTRYPOINT ["/root/wrapper"]

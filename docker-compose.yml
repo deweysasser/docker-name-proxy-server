@@ -1,0 +1,19 @@
+proxy:
+  image: nginx
+  volumes:
+   - /etc/nginx/conf.d
+   - /usr/share/nginx/html
+  ports:
+    - "8002:80"
+
+updater:
+  build: .
+  environment:
+    DOMAIN: example.com
+    _foo: project_container_1
+    _bar: missing
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+  volumes_from:
+    - proxy
+
