@@ -104,9 +104,28 @@ def generate_html(file, forward):
     print >> file, "</ul>"
     
     
+def collect_from_environment():
+    '''Collect information from the legacy environment variables'''
+    l = list()
+    if 'DOMAIN' in os.environ:
+        domain=os.environ['DOMAIN']
+    else:
+        return
+
+    for k,v in os.environ.iteritems():
+        if k.startswith("__"):
+            (container_name, container_port) = v.split(":", 1)
+            hostname = "{}.{}".format(k[2:], domain)
+            l.append( (hostname,
+                       "80",
+                       container_name,
+                       container_port))
+
+    return l
         
 def main():    
     forward=collect_host_tuples(container_ids())
+    forward.extend(collect_from_environment())
     forward.sort(key=lambda x: (x[0], x[1]))
 
     with open("/etc/nginx/conf.d/proxy.conf", "w") as f:
