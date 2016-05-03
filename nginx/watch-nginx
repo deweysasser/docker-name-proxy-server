@@ -1,0 +1,12 @@
+#!/bin/bash
+
+( 
+    inotifywait -r -m -e modify -e move -e create -e delete /etc/nginx | while read LINE; do
+      echo -n "Sending HUP signal to nginx..."
+      killall -HUP nginx && echo "SUCCESS" || echo "FAILED"
+  done	    
+) &
+
+while true; do
+      nginx -g 'daemon off;' || sleep 2
+done
