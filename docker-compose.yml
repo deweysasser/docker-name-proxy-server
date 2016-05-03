@@ -11,6 +11,8 @@ proxy:
 
 updater:
   build: .
+  cap_drop:
+     - ALL
   environment:
     DOMAIN: example.com
     _foo: project_container_1
