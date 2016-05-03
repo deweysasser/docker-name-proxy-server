@@ -5,18 +5,11 @@ proxy:
    - /usr/share/nginx/html
   ports:
     - "8002:80"
-  labels:
-    - "proxy.host.name=demo-dashboard"
-    - "proxy.host.ports= 80:8080 5000:5000"
 
 updater:
   build: .
   cap_drop:
      - ALL
-  environment:
-    DOMAIN: example.com
-    _foo: project_container_1
-    _bar: missing
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
   volumes_from:
