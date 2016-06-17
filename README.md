@@ -12,30 +12,43 @@ This is what Apache Server calls "Named Virtual Hosts" and NGINX calls
 
 ## Usage
 
-Using e.g. docker-compose, try something like this:
+The proxy consists of 2 docker containers:
 
-     proxyserver:
-       build: .
-       ports:
-         - 80:80
-       links:
-         - webserver:service
-         - jenkins:build
-         - dashboard:dashboard
-       environment:
-         DOMAIN: example.com
-         __build: build:8080
-         __web: service:80
-         __dashboard: dashboard:5000
+1) a priviledged container that subscribes to docker events and generates a configuration file
+2) a non-priviledged (other than listening on port 80) container that consumes the generated configuration file and proxies traffic to the appropriate container.
 
-This will have the proxy server listen on port 80, and when it is
-called as "build.example.com" (e.g. "curl build.example.com" it will
-forward traffic to the linked docker container referred to internally
-as 'build' on port 8080 (which is linked to a container named 'jenkins').
+## Configuring proxies
 
-When called as "web.example.com", traffic will be forwarded to the
-linked docker container referred to as 'dashboard' on port 5000.
+Traffic is proxied acording to container metadata as expressed in docker labels.
 
-Note that this allows the implementation containers ports to remain
-unexposed on the host.
+The label "proxy.host" is used as a hostname which proxies to a
+certain container.  This should be a FQDN (fully qualified domain name
+-- e.g. "foo.example.com")
+
+The label "proxy.ports" contsists of a space separated list to which
+to proxy.  Each entry can be either a port to be proxied, or a pair of
+"src:dst" for a source port and destination port.
+
+Example:
+
+     docker run -d --label proxy.host=foo.example.com --label proxy.ports="5000 81:82 80" nginx
+
+Creates an entry so that traffic received going to "foo.example.com"
+on port 5000 is proxied to the container on port 5000, traffic
+received to that name on port 81 is proxied to the container's port 82
+and traffic received on port 80 is proxied to port 80.
+
+## Load Balancing
+
+Note that several container may specifiy that they handle traffice for
+the same name and port combination.  This is a supported
+configuration.  The received traffic will be load-balanced between the
+containers subscribing to the same end point using nginx's "ip_hash"
+sticky traffic mechanism.
+
+There is no connection draining on exit, so if you terminate a
+container subscribed to a given endpoint, the traffic will go to a
+different endpoint without regard to session state.
+
+
 
