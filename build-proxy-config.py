@@ -52,6 +52,7 @@ def upstream(file, tuples):
     '''Generate the upstream block for nginx.conf'''
     for key, group in itertools.groupby(tuples, lambda x: x[0]):
         print >> file,  "upstream {} {{ ".format(to_token(key))
+        print >> file,  "  ip_hash;"
         for t in group:
             print >> file,  "   server {};".format(t[1])
         print >> file,  "}\n"
