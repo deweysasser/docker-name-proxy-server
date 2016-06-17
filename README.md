@@ -17,6 +17,51 @@ The proxy consists of 2 docker containers:
 1) a priviledged container that subscribes to docker events and generates a configuration file
 2) a non-priviledged (other than listening on port 80) container that consumes the generated configuration file and proxies traffic to the appropriate container.
 
+## Deploying the proxy/updater combination
+
+The two containers must be deployed on a single host and be linked by
+volumes.  One way to do that is with the following docker-compose.yml
+file:
+
+     proxy:
+       build: nginx
+       volumes:
+        - /etc/nginx/conf.d
+        - /usr/share/nginx/html
+       ports:
+         - "80:80"
+       cap_drop:
+        - ALL
+       cap_add:
+        - SETUID
+        - SETGID
+        - CHOWN
+        - KILL
+        - NET_BIND_SERVICE
+          
+     updater:
+       build: .
+       cap_drop:
+          - ALL
+       volumes:
+         - /var/run/docker.sock:/var/run/docker.sock
+       volumes_from:
+         - proxy
+
+The down side of this file is that the proxy must be redeployed any time the exposed ports change.
+
+Alternatively, you could use this stanza for the proxy:
+
+     proxy:
+       build: nginx
+       volumes:
+        - /etc/nginx/conf.d
+        - /usr/share/nginx/html
+       net: host
+
+This configuration will allow dynamic selection of listening ports but
+may cause nginx start-up problems if ports are already bound.
+
 ## Configuring proxies
 
 Traffic is proxied acording to container metadata as expressed in docker labels.
@@ -52,7 +97,7 @@ different endpoint without regard to session state.
 
 
 
-## Legacy Environment variable support
+## Legacy configuration via environment variables
 
 In order to support the legacy configuration method, the updater
 container configuration will also be updated in response to certain
@@ -85,3 +130,6 @@ unexposed on the host.
   system to be run as a single container as well as allowing the
   listening ports on the proxy to be dynamically configured by the
   updater.
+
+  The challenge here will be avoiding destroying the entire proxy if
+  there's a port conflict.
