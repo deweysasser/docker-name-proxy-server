@@ -16,6 +16,7 @@ def container_ids():
 
 
 def collect_host_tuples(ids):
+    '''Collect the 4-tuple of (name, port, target-ip, target-port) for each of the given container IDs'''
     def ext(l, value):
         l.extend(value)
         return l
@@ -24,20 +25,31 @@ def collect_host_tuples(ids):
 
 
 def collect_host_tuple(id):
+    '''Return information about a specific container, or None if the container has no labels'''
     container = cli.inspect_container(id)
     ip=container['NetworkSettings']['IPAddress']
+    name=container['Name']
     if not 'Labels' in container['Config']: return None
     labels=container['Config']['Labels']
 
     if "proxy.host" in labels:
         name=labels["proxy.host"]
         def port(p):
-            (host_port, container_port) = p.split(":")
-            return (name, host_port, ip, container_port)
-        r = map(port, labels["proxy.ports"].split())
+            s = p.split(":")
+            if len(s) > 1:
+                (host_port, container_port) = s
+            else:
+                (host_port, container_port) = (p, p)
+            return (name, host_port, ip, container_port, name)
+        if not "proxy.ports" in labels:
+            return [(name, "80", ip, "80", name)]
+
+        ports = labels["proxy.ports"].split()
+        r = map(port, ports)
         return r
 
 def upstream(file, tuples):
+    '''Generate the upstream block for nginx.conf'''
     for key, group in itertools.groupby(tuples, lambda x: x[0]):
         print >> file,  "upstream {} {{ ".format(to_token(key))
         for t in group:
@@ -45,6 +57,7 @@ def upstream(file, tuples):
         print >> file,  "}\n"
 
 def listen(file, ports):
+    '''Generate the server block for nginx.conf'''
     pass
 #    for p in ports:
 #        print >> file,  "server {"
@@ -89,6 +102,7 @@ def generate(file, forward):
     server(file, servers)
 
 def generate_html(file, forward):
+    '''Generate the HTML file which is displayed when no valid name is given'''
     seen=dict()
 
     def out(x):
@@ -110,7 +124,7 @@ def collect_from_environment():
     if 'DOMAIN' in os.environ:
         domain=os.environ['DOMAIN']
     else:
-        return
+        return []
 
     for k,v in os.environ.iteritems():
         if k.startswith("__"):
@@ -119,11 +133,16 @@ def collect_from_environment():
             l.append( (hostname,
                        "80",
                        container_name,
-                       container_port))
+                       container_port,
+                       container_name))
 
     return l
         
 def main():    
+    '''Collect proxy information from all containers and from the
+       environment and generate the appropriate nginx configuration
+       files'''
+
     forward=collect_host_tuples(container_ids())
     forward.extend(collect_from_environment())
     forward.sort(key=lambda x: (x[0], x[1]))
