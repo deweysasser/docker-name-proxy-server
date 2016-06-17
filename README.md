@@ -77,3 +77,11 @@ linked docker container referred to as 'dashboard' on port 5000.
 
 Note that this allows the implementation containers ports to remain
 unexposed on the host.
+
+
+# TODO:  Future development possibilities
+
+* have the updater start and restart the proxy.  This will allow the
+  system to be run as a single container as well as allowing the
+  listening ports on the proxy to be dynamically configured by the
+  updater.
