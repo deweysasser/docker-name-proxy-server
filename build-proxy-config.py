@@ -11,8 +11,9 @@ if 'DOCKER_HOST' in os.environ:
 else:
     cli = docker.Client(base_url='unix://var/run/docker.sock')
 
-def container_ids():
-    return [x['Id'] for x in cli.containers()]
+def container_ids(c=None):
+    containers = cli.containers() if c is None else c
+    return [x['Id'] for x in containers]
 
 
 def collect_host_tuples(ids):
@@ -28,7 +29,7 @@ def collect_host_tuple(id):
     '''Return information about a specific container, or None if the container has no labels'''
     container = cli.inspect_container(id)
     ip=container['NetworkSettings']['IPAddress']
-    name=container['Name']
+    cname=container['Name'][1:]
     if not 'Labels' in container['Config']: return None
     labels=container['Config']['Labels']
 
@@ -40,9 +41,9 @@ def collect_host_tuple(id):
                 (host_port, container_port) = s
             else:
                 (host_port, container_port) = (p, p)
-            return (name, host_port, ip, container_port, name)
+            return (name, host_port, ip, container_port, cname)
         if not "proxy.ports" in labels:
-            return [(name, "80", ip, "80", name)]
+            return [(name, "80", ip, "80", cname)]
 
         ports = labels["proxy.ports"].split()
         r = map(port, ports)
@@ -54,7 +55,7 @@ def upstream(file, tuples):
         print >> file,  "upstream {} {{ ".format(to_token(key))
         print >> file,  "  ip_hash;"
         for t in group:
-            print >> file,  "   server {};".format(t[1])
+            print >> file,  "   server {}; # {}".format(t[1], t[2])
         print >> file,  "}\n"
 
 def listen(file, ports):
@@ -92,7 +93,7 @@ def to_token(name):
 def generate(file, forward):
 
     upstream(file,
-        [("{}:{}".format(x[0],x[1]), "{}:{}".format(x[2],x[3])) for x in forward]
+        [("{}:{}".format(x[0],x[1]), "{}:{}".format(x[2],x[3]), x[4]) for x in forward]
         )
 
     listen(file, set([x[1] for x in forward]))
@@ -119,7 +120,7 @@ def generate_html(file, forward):
     print >> file, "</ul>"
     
     
-def collect_from_environment():
+def collect_from_environment(containers):
     '''Collect information from the legacy environment variables'''
     l = list()
     if 'DOMAIN' in os.environ:
@@ -127,15 +128,24 @@ def collect_from_environment():
     else:
         return []
 
+    # Get us a dict of containers by name
+    byname=dict()
+    for c in containers:
+        byname[c['Names'][0]] = c
+
     for k,v in os.environ.iteritems():
         if k.startswith("__"):
             (container_name, container_port) = v.split(":", 1)
-            hostname = "{}.{}".format(k[2:], domain)
-            l.append( (hostname,
-                       "80",
-                       container_name,
-                       container_port,
-                       container_name))
+            cname = u"/{}".format(container_name)
+            if cname in byname:
+                container = cli.inspect_container(byname[cname]['Id'])
+                container_ip = container['NetworkSettings']['IPAddress']
+                hostname = "{}.{}".format(k[2:], domain)
+                l.append( (hostname,
+                           "80",
+                           container_ip,
+                           container_port,
+                           container_name))
 
     return l
         
@@ -144,8 +154,10 @@ def main():
        environment and generate the appropriate nginx configuration
        files'''
 
-    forward=collect_host_tuples(container_ids())
-    forward.extend(collect_from_environment())
+    containers = cli.containers()
+
+    forward=collect_host_tuples(container_ids(containers))
+    forward.extend(collect_from_environment(containers))
     forward.sort(key=lambda x: (x[0], x[1]))
 
     with open("/etc/nginx/conf.d/proxy.conf", "w") as f:

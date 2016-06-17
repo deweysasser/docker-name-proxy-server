@@ -52,3 +52,28 @@ different endpoint without regard to session state.
 
 
 
+## Legacy Environment variable support
+
+In order to support the legacy configuration method, the updater
+container configuration will also be updated in response to certain
+environment variable settings.
+
+Using e.g. docker-compose.override.yml, try something like this:
+
+ updater:
+   environment:
+     DOMAIN: example.com
+     __build: jenkins:8080
+     __web: webserver:80
+     __dashboard: dashboard:5000
+
+This will have the proxy server listen on port 80, and when it is
+called as "build.example.com" (e.g. "curl build.example.com" it will
+forward traffic to the named docker container named 'jenkins' port
+8080.
+
+When called as "web.example.com", traffic will be forwarded to the
+linked docker container referred to as 'dashboard' on port 5000.
+
+Note that this allows the implementation containers ports to remain
+unexposed on the host.
