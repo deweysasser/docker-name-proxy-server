@@ -5,7 +5,7 @@
 #
 
 # Pull base image.
-FROM ubuntu:14.04
+FROM debian:jessie
 
 RUN apt-get update && apt-get -y install curl python
 RUN curl https://get.docker.com | bash
