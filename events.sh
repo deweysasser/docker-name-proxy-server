@@ -8,4 +8,5 @@
 docker events -f type=container -f event=die -f event=start | while read time ID LINE ; do
     echo "id $ID: $LINE"
     `dirname $0`/build-proxy-config.py
+    sh /etc/proxy/notify.sh
 done

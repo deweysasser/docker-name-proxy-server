@@ -14,8 +14,10 @@ This is what Apache Server calls "Named Virtual Hosts" and NGINX calls
 
 The proxy consists of 2 docker containers:
 
-1) a priviledged container that subscribes to docker events and generates a configuration file
-2) a non-priviledged (other than listening on port 80) container that consumes the generated configuration file and proxies traffic to the appropriate container.
+1) a priviledged container that subscribes to docker events and generates an NGINX configuration file (and a few other files)
+2) an NGINX container that uses the generated file to proxy traffic to other containers
+
+Note that you must configure notifications correct for nginx to be reloaded on configuration changes
 
 ## Deploying the proxy/updater combination
 
@@ -24,20 +26,14 @@ volumes.  One way to do that is with the following docker-compose.yml
 file:
 
      proxy:
-       build: nginx
+       image: nginx
        volumes:
         - /etc/nginx/conf.d
         - /usr/share/nginx/html
        ports:
          - "80:80"
-       cap_drop:
-        - ALL
-       cap_add:
-        - SETUID
-        - SETGID
-        - CHOWN
-        - KILL
-        - NET_BIND_SERVICE
+       labels:
+         - proxy.notify
           
      updater:
        build: .
@@ -53,7 +49,7 @@ The down side of this file is that the proxy must be redeployed any time the exp
 Alternatively, you could use this stanza for the proxy:
 
      proxy:
-       build: nginx
+       image: nginx
        volumes:
         - /etc/nginx/conf.d
         - /usr/share/nginx/html
@@ -83,9 +79,17 @@ on port 5000 is proxied to the container on port 5000, traffic
 received to that name on port 81 is proxied to the container's port 82
 and traffic received on port 80 is proxied to port 80.
 
+## Configuring notifications
+
+For each container labeled 'proxy.notify' with no value, the updater
+will invoke "kill -HUP 1" inside that container.  If the
+'proxy.notify' label has a value, that value is taken as a command to
+run inside the container to notify of configuration changes.
+
+
 ## Load Balancing
 
-Note that several container may specifiy that they handle traffice for
+Note that several container may specifiy that they handle traffic for
 the same name and port combination.  This is a supported
 configuration.  The received traffic will be load-balanced between the
 containers subscribing to the same end point using nginx's "ip_hash"
@@ -99,6 +103,9 @@ different endpoint without regard to session state.
 
 ## Legacy configuration via environment variables
 
+Docker labels is the preferred method of specifying proxy
+configuration and notification.
+
 In order to support the legacy configuration method, the updater
 container configuration will also be updated in response to certain
 environment variable settings.
@@ -111,6 +118,7 @@ Using e.g. docker-compose.override.yml, try something like this:
      __build: jenkins:8080
      __web: webserver:80
      __dashboard: dashboard:5000
+     NOTIFY:  docker run proxy kill -HUP 1
 
 This will have the proxy server listen on port 80, and when it is
 called as "build.example.com" (e.g. "curl build.example.com" it will
@@ -120,16 +128,10 @@ forward traffic to the named docker container named 'jenkins' port
 When called as "web.example.com", traffic will be forwarded to the
 linked docker container referred to as 'dashboard' on port 5000.
 
+The 'NOTIFY' environment variable can specify a command to run when
+configuration changes.
+
 Note that this allows the implementation containers ports to remain
 unexposed on the host.
 
 
-# TODO:  Future development possibilities
-
-* have the updater start and restart the proxy.  This will allow the
-  system to be run as a single container as well as allowing the
-  listening ports on the proxy to be dynamically configured by the
-  updater.
-
-  The challenge here will be avoiding destroying the entire proxy if
-  there's a port conflict.

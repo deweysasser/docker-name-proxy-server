@@ -148,6 +148,36 @@ def collect_from_environment(containers):
                            container_name))
 
     return l
+
+def collect_notifications(containers):
+    '''Collect the notification commands for the running containers.
+
+    RETURN a list of (container-id, command)'''
+
+    results=[]
+
+    if "NOTIFY" in os.environ:
+        results.append((os.environ["NOTIFY"], "kill -HUP 1"))
+
+    for cid in containers:
+        container = cli.inspect_container(cid)
+        if not 'Labels' in container['Config']: return None
+        labels=container['Config']['Labels']
+
+        if "proxy.notify" in labels:
+            cmd=labels['proxy.notify']
+            if cmd is None or cmd == '':
+                results.append((cid, "kill -HUP 1"))
+            else:
+                results.append((cid, cmd))
+
+    return results            
+
+def generate_notify_command(file, notifications):
+    '''Generate the shell script full of notification commands'''
+    for n in notifications:
+        print >>file, "docker exec {id} {command}".format(id=n[0], command=n[1])
+
         
 def main():    
     '''Collect proxy information from all containers and from the
@@ -155,8 +185,9 @@ def main():
        files'''
 
     containers = cli.containers()
+    ids = container_ids(containers)
 
-    forward=collect_host_tuples(container_ids(containers))
+    forward=collect_host_tuples(ids)
     forward.extend(collect_from_environment(containers))
     forward.sort(key=lambda x: (x[0], x[1]))
 
@@ -165,6 +196,9 @@ def main():
 
     with open("/usr/share/nginx/html/index.html", "w") as f:
         generate_html(f, forward)
+
+    with open("/etc/proxy/notify.sh", "w") as f:
+        generate_notify_command(f, collect_notifications(ids))
 
 if __name__ == "__main__":
     main()

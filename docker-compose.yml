@@ -1,18 +1,12 @@
 proxy:
-  build: nginx
+  image: nginx
   volumes:
    - /etc/nginx/conf.d
    - /usr/share/nginx/html
   ports:
     - "8002:80"
-  cap_drop:
-   - ALL
-  cap_add:
-   - SETUID
-   - SETGID
-   - CHOWN
-   - KILL
-   - NET_BIND_SERVICE
+  labels:
+   - proxy.notify
 
 updater:
   build: .
