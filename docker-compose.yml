@@ -4,16 +4,19 @@ proxy:
    - /etc/nginx/conf.d
    - /usr/share/nginx/html
   ports:
-    - "8002:80"
+    - "80:80"
+    - "443:443"
   labels:
    - proxy.notify
+  restart: always
 
 updater:
-  build: .
+  image: deweysasser/name-proxy-server
   cap_drop:
      - ALL
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
   volumes_from:
     - proxy
+  restart: always
 

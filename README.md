@@ -1,11 +1,11 @@
 # Name based proxy server
 
 This image is a named based proxy server.  By defining appropriate
-environment variables, you can have it do host name based mapping to
-foward to different server processes.
+labels on docker containers, you can have it do host name based
+mapping to foward to different containers.
 
 The design point is to multiplex a single port 80 to different
-back-end processes.
+back-end containers.
 
 This is what Apache Server calls "Named Virtual Hosts" and NGINX calls
 "server blocks".
@@ -14,16 +14,21 @@ This is what Apache Server calls "Named Virtual Hosts" and NGINX calls
 
 The proxy consists of 2 docker containers:
 
-1) a priviledged container that subscribes to docker events and generates an NGINX configuration file (and a few other files)
-2) an NGINX container that uses the generated file to proxy traffic to other containers
+1) a priviledged container that subscribes to docker events and
+   generates an NGINX configuration file (and a few other files)
 
-Note that you must configure notifications correct for nginx to be reloaded on configuration changes
+2) an NGINX container that uses the generated file to proxy traffic to
+   other containers
+
+Note that you must configure notifications correctly for nginx to be
+reloaded on configuration changes
 
 ## Deploying the proxy/updater combination
 
-The two containers must be deployed on a single host and be linked by
-volumes.  One way to do that is with the following docker-compose.yml
-file:
+The two containers must be deployed on a single host and share a data
+volume by volumes.  
+
+One way to do that is with the following docker-compose.yml file:
 
      proxy:
        image: nginx
@@ -44,7 +49,8 @@ file:
        volumes_from:
          - proxy
 
-The down side of this file is that the proxy must be redeployed any time the exposed ports change.
+The down side of this file is that the proxy must be redeployed any
+time the exposed ports change.
 
 Alternatively, you could use this stanza for the proxy:
 
@@ -60,7 +66,8 @@ may cause nginx start-up problems if ports are already bound.
 
 ## Configuring proxies
 
-Traffic is proxied acording to container metadata as expressed in docker labels.
+Traffic is proxied acording to container metadata as expressed in
+docker labels.
 
 The label "proxy.host" is used as a hostname which proxies to a
 certain container.  This should be a FQDN (fully qualified domain name
@@ -78,6 +85,8 @@ Creates an entry so that traffic received going to "foo.example.com"
 on port 5000 is proxied to the container on port 5000, traffic
 received to that name on port 81 is proxied to the container's port 82
 and traffic received on port 80 is proxied to port 80.
+
+If you do not specify proxy.ports, it defaults to port 80.
 
 ## Configuring notifications
 
