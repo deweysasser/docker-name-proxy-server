@@ -10,6 +10,9 @@ back-end containers.
 This is what Apache Server calls "Named Virtual Hosts" and NGINX calls
 "server blocks".
 
+See "Motivation" section for an other projects and an explanation of
+why I wrote this.
+
 ## Usage
 
 The proxy consists of 2 docker containers:
@@ -144,3 +147,22 @@ Note that this allows the implementation containers ports to remain
 unexposed on the host.
 
 
+## Motivation
+
+This system is largely inspirted by
+https://github.com/jwilder/nginx-proxy.  The reason I wrote this,
+instead of just using jwilder's excellent image, is a difference in
+assumptions.
+
+He assumes that any exposed port should be proxied.  My package allows
+translations of proxied ports.
+
+For example, the standard "jenkins" docker images exposes (and
+services requests on) port 8080.  I wish port 80 proxied to that port.
+At the time this was written, his package could not accomplish that.
+
+Also, at the time this was originally written, his package did not
+document a way to run the monitor process and proxy process in
+separate containers.  Running proxy and monitor (i.e. something which
+has access to the docker socket) in the same container is not a great
+idea.
