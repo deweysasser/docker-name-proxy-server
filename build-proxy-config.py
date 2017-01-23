@@ -37,14 +37,6 @@ def collect_host_tuple(id):
     if not 'Labels' in container['Config']: return None
     labels=container['Config']['Labels']
 
-    # this is likely a blatant hack to deal with swarm-mode.  
-
-    # using the service name means we're taking advantage of swarm
-    # mode load balancing/transport
-
-    if not ip:
-        ip = labels["com.docker.swarm.service.name"]
-
     if "proxy.host" in labels:
         name=labels["proxy.host"]
         def port(p):
