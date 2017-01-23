@@ -108,8 +108,9 @@ attempt to update the appropriate Route 53 zone for the name in the
 proxy.host (or environment) labels.
 
 In this mode it uses either the contents of ~/.aws/credentials (by
-default there are none) or additional command line arguments --key and
---secret for AWS credenitals.
+default there are none), additional command line arguments --key and
+--secret for AWS credenitals, or environemnt variables
+AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
 
 The IP address can be encoded on the commad line (with --my-ip <IP>),
 introspected using a public IP address service (--public-ip-service),
