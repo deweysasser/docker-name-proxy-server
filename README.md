@@ -191,3 +191,8 @@ document a way to run the monitor process and proxy process in
 separate containers.  Running proxy and monitor (i.e. something which
 has access to the docker socket) in the same container is not a great
 idea.
+
+## Contributing
+
+See the file HACKING.md for information on how to contribute to this
+project.
