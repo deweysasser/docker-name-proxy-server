@@ -13,6 +13,9 @@ This is what Apache Server calls "Named Virtual Hosts" and NGINX calls
 See "Motivation" section for an other projects and an explanation of
 why I wrote this.
 
+This tool can additionally update Route 53 host names with the IP of
+the current host or instance.
+
 ## Usage
 
 The proxy consists of 2 docker containers:
@@ -97,6 +100,27 @@ For each container labeled 'proxy.notify' with no value, the updater
 will invoke "kill -HUP 1" inside that container.  If the
 'proxy.notify' label has a value, that value is taken as a command to
 run inside the container to notify of configuration changes.
+
+## Updating Route 53
+
+When run with command line argument "--route53", the container will
+attempt to update the appropriate Route 53 zone for the name in the
+proxy.host (or environment) labels.
+
+In this mode it uses either the contents of ~/.aws/credentials (by
+default there are none) or additional command line arguments --key and
+--secret for AWS credenitals.
+
+The IP address can be encoded on the commad line (with --my-ip <IP>),
+introspected using a public IP address service (--public-ip-service),
+or introspected using AWS metadata service.  The the last case, the
+"--aws-external-ip" flag specifies using the external, public IP of
+the instance and "--aws-internal-ip" flag specifies using the local,
+internal IP of the instance.  The default is to use a public web
+service to determine the external IP address.
+
+In all cases, if updating Route 53 fails, the program will continue to
+attempt other updates.
 
 
 ## Load Balancing

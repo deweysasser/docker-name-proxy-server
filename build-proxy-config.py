@@ -5,6 +5,10 @@ import re
 import docker
 import json
 import itertools
+import boto3
+import argparse
+import urllib2
+
 
 if 'DOCKER_HOST' in os.environ:
     cli = docker.Client(base_url=os.environ['DOCKER_HOST'])
@@ -178,17 +182,116 @@ def generate_notify_command(file, notifications):
     for n in notifications:
         print >>file, "docker exec {id} {command}".format(id=n[0], command=n[1])
 
+def get_host_ip(args):
+    '''Get the AWS host IP.  
+
+    Use 'args' to determine exact behavior:
+       * args.my_ip is set, return it
+       * args.aws_public_ip is True, return public instance IP retrieved from AWS instance metadata service
+       * args.aws_local_ip is True, return local (private) instance IP retrieved from AWS instance metadata service
+       * otherwise, return the public IP as determined by an Internet IP address reporting service
+
+       if no IP can be found or the web call fails, the method will raise an exception'''
+
+
+    if args.my_ip is not None:
+        ip = args.my_ip
+    elif args.aws_public_ip:
+        ip = urllib2.urlopen("http://169.254.169.254/latest/meta-data/public-ipv4").read()
+    elif args.aws_local_ip:
+        ip = urllib2.urlopen("http://169.254.169.254/latest/meta-data/local-ipv4").read()
+    else:
+        ip = urllib2.urlopen("http://ipv4bot.whatismyipaddress.com").read()
+
+    if ip is None:
+        raise Exception("Can't get IP")
+    return ip
+
+def get_zone_id(client, domain):
+    '''Return the Route 53 zone id for the given 'domain'
+    '''
+    response = client.list_hosted_zones()
+    
+    name=domain
+    if not name.endswith("."):
+        name = domain + "."
+        
+    zones = [x for x in response['HostedZones'] 
+             if x['Name'] == name]
+    
+    if len(zones) < 1:
+        raise Exception("Can't find existing zone for %s" % domain)
+    
+    return zones[0]['Id']
+
+def update_route53(args, names, ip):
+    '''Update Route 53 for all the names given to the specified ip'''
+
+    if args.key:
+        # Credentials are specified on the command line (or environment)
+        client = boto3.client(
+            'route53',
+            aws_access_key_id=args.key,
+            aws_secret_access_key=args.secret,
+            )
+    else:
+        # In case we can use the ~/.aws/credentials file
+        client = boto3.client('route53')
+
+    for name in names:
+        try:
+            hostname, domain = name.split(".", 1)
+            zone_id = get_zone_id(client, domain)
+
+            if zone_id:
+                print "Updating %s to %s in zone %s" % (name, ip, zone_id)
+                response = client.change_resource_record_sets(
+                    HostedZoneId=zone_id,
+                    ChangeBatch={
+                        "Comment": 'Automatically created entry for docker service',
+                        "Changes": [
+                            {
+                                "Action": "UPSERT",
+                                "ResourceRecordSet": {
+                                    "Name": name,
+                                    "Type": 'A',
+                                    "TTL": 300,
+                                    "ResourceRecords": [
+                                        {
+                                            "Value": ip
+                                            },
+                                        ],
+                                    }
+                                },
+                            ]
+                        }
+                    )
+        except Exception as e:
+            print "ERROR while updating {} to {}: {}".format(name, ip, e)
         
 def main():    
     '''Collect proxy information from all containers and from the
        environment and generate the appropriate nginx configuration
        files'''
 
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--route53", action='store_true', help="True if we should update Route 53")
+    parser.add_argument("--key", help="AWS key to use", default=os.getenv('AWS_ACCESS_KEY_ID'))
+    parser.add_argument("--secret", help="AWS secret to use", default=os.getenv('AWS_SECRET_ACCESS_KEY'))
+    parser.add_argument("--aws-public-ip", action='store_true', help="Update Route 53 with public IP")
+    parser.add_argument("--aws-local-ip", action='store_true', help="Update Route 53 with local IP")
+    
+    parser.add_argument("--my-ip", help="Use the given IP instead of the discovered one")
+#    parser.add_argument("--public-ip-service", action='store_true', help="Use a public IP service (whatismyip.com) to determine public IP")
+
+    args = parser.parse_args()
+
     containers = cli.containers()
     ids = container_ids(containers)
 
     forward=collect_host_tuples(ids)
-    forward.extend(collect_from_environment(containers))
+    forward.extend(collect_from_environment(containers)) 
     forward.sort(key=lambda x: (x[0], x[1]))
 
     with open("/etc/nginx/conf.d/proxy.conf", "w") as f:
@@ -199,6 +302,10 @@ def main():
 
     with open("/etc/proxy/notify.sh", "w") as f:
         generate_notify_command(f, collect_notifications(ids))
+
+    if args.route53:
+        ip=get_host_ip(args)
+        update_route53(args, [x[0] for x in forward], ip)
 
 if __name__ == "__main__":
     main()
