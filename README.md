@@ -107,10 +107,14 @@ When run with command line argument "--route53", the container will
 attempt to update the appropriate Route 53 zone for the name in the
 proxy.host (or environment) labels.
 
-In this mode it uses either the contents of ~/.aws/credentials (by
-default there are none), additional command line arguments --key and
---secret for AWS credenitals, or environemnt variables
-AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
+In this mode it uses one of the following credentials:
+
+  * the priviledges of the host or container (if an appropriate IAM
+    role is set)
+  * the contents of ~/.aws/credentials (by default there are none)
+  * the values specified by command line arguments --key and --secret
+    for AWS credenitals
+  * environemnt variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.
 
 The IP address can be encoded on the commad line (with --my-ip <IP>),
 introspected using a public IP address service (--public-ip-service),
@@ -122,6 +126,27 @@ service to determine the external IP address.
 
 In all cases, if updating Route 53 fails, the program will continue to
 attempt other updates.
+
+The following IAM policy must be in effect for the credentials used to
+update Route53:
+
+     {
+         "Version": "2012-10-17",
+         "Statement": [
+             {
+                 "Sid": "Stmt1485728091000",
+                 "Effect": "Allow",
+                 "Action": [
+                     "route53:ListHostedZones",
+                     "route53:ListResourceRecordSets",
+                     "route53:ChangeResourceRecordSets"
+                 ],
+                 "Resource": [
+                     "*"
+                 ]
+             }
+         ]
+     }
 
 
 ## Load Balancing
