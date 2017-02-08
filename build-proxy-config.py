@@ -28,6 +28,17 @@ def collect_host_tuples(ids):
 
     return reduce(ext, filter(None, map(collect_host_tuple, ids)), [])
 
+def collect_nonproxy_hosts(id):
+    '''Return information about a specific container, or None if the container has no labels'''
+    container = cli.inspect_container(id)
+    ip=container['NetworkSettings']['IPAddress']
+    cname=container['Name'][1:]
+    if not 'Labels' in container['Config']: return None
+    labels=container['Config']['Labels']
+
+    if "dns.hostname" in labels:
+        name=labels["dns.hostname"]
+        return name
 
 def collect_host_tuple(id):
     '''Return information about a specific container, or None if the container has no labels'''
@@ -305,7 +316,11 @@ def main():
 
     if args.route53:
         ip=get_host_ip(args)
-        update_route53(args, [x[0] for x in forward], ip)
+        proxy_names = [x[0] for x in forward]
+        route53_names = filter(None, map(collect_nonproxy_hosts, ids))
+
+        print "Adding proxy names {} and route53 names {}".format(proxy_names, route53_names)
+        update_route53(args, proxy_names + route53_names, ip)
 
 if __name__ == "__main__":
     main()
