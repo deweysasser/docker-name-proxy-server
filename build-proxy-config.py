@@ -91,8 +91,13 @@ def listen(file, ports):
 
 def server(file, tuples):
     for t in tuples:
-        name=" ".join([t[0],
-                      t[0].split('.',1)[0]])
+        shortname=t[0].split('.',1)[0]
+        name=t[0]
+
+        if name != shortname:
+            names = " ".join([name, shortname])
+        else:
+            names = name
         print >> file,  '''
 server {{
   listen  {host_port};
@@ -108,7 +113,7 @@ server {{
    }}
 }}
 
-'''.format(name=name, host_port=t[1], upstream=to_token("{}:{}".format(t[0],t[1])))
+'''.format(name=names, host_port=t[1], upstream=to_token("{}:{}".format(t[0],t[1])))
 
 def to_token(name):
     regexp = re.compile("[^a-zA-Z0-9_]")
@@ -321,7 +326,7 @@ def main():
     forward=collect_host_tuples(ids)
 
     forward.extend(collect_from_environment(containers)) 
-    forward.sort(key=lambda x: (x[0], x[1]))
+    forward.sort(key=lambda x: (x.hostname, x.port))
 
     with open("/etc/nginx/conf.d/proxy.conf", "w") as f:
         generate(f, forward)

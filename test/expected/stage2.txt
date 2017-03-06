@@ -13,7 +13,18 @@ upstream host2_80 {
 
 server {
   listen  80;
-  server_name host1 host1;
+  server_name _;
+
+  location / {
+      root /usr/share/nginx/html;
+   }
+}
+
+
+
+server {
+  listen  80;
+  server_name host1;
 
   location / {
       proxy_pass http://host1_80;
@@ -29,7 +40,7 @@ server {
 
 server {
   listen  80;
-  server_name host2 host2;
+  server_name host2;
 
   location / {
       proxy_pass http://host2_80;
