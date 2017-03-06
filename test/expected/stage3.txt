@@ -1,0 +1,84 @@
+upstream host1_example_com_80 { 
+  ip_hash;
+   server 0.0.0.0:80; # nginx-host1
+}
+
+upstream host2_example_com_80 { 
+  ip_hash;
+   server 0.0.0.0:80; # nginx-host2
+}
+
+upstream host3_example_com_80 { 
+  ip_hash;
+   server 0.0.0.0:80; # nginx-host3
+}
+
+upstream host4_foobar_com_80 { 
+  ip_hash;
+   server 0.0.0.0:80; # nginx-host4.foobar.com
+}
+
+
+server {
+  listen  80;
+  server_name host3.example.com host3;
+
+  location / {
+      proxy_pass http://host3_example_com_80;
+      proxy_redirect default;
+
+      proxy_set_header   Host             $host;
+      proxy_set_header   X-Real-IP        $remote_addr;
+      proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
+   }
+}
+
+
+
+server {
+  listen  80;
+  server_name host2.example.com host2;
+
+  location / {
+      proxy_pass http://host2_example_com_80;
+      proxy_redirect default;
+
+      proxy_set_header   Host             $host;
+      proxy_set_header   X-Real-IP        $remote_addr;
+      proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
+   }
+}
+
+
+
+server {
+  listen  80;
+  server_name host1.example.com host1;
+
+  location / {
+      proxy_pass http://host1_example_com_80;
+      proxy_redirect default;
+
+      proxy_set_header   Host             $host;
+      proxy_set_header   X-Real-IP        $remote_addr;
+      proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
+   }
+}
+
+
+
+server {
+  listen  80;
+  server_name host4.foobar.com host4;
+
+  location / {
+      proxy_pass http://host4_foobar_com_80;
+      proxy_redirect default;
+
+      proxy_set_header   Host             $host;
+      proxy_set_header   X-Real-IP        $remote_addr;
+      proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
+   }
+}
+
+

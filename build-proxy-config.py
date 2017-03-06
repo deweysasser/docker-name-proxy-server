@@ -8,6 +8,14 @@ import itertools
 import boto3
 import argparse
 import urllib2
+import collections
+
+Record=collections.namedtuple('Record', 'hostname, port, container_ip, container_port, container_name')
+
+if 'DOMAIN' in os.environ:
+    DOMAIN=os.environ['DOMAIN']
+else:
+    DOMAIN=None
 
 
 if 'DOCKER_HOST' in os.environ:
@@ -28,6 +36,17 @@ def collect_host_tuples(ids):
 
     return reduce(ext, filter(None, map(collect_host_tuple, ids)), [])
 
+def collect_nonproxy_hosts(id):
+    '''Return information about a specific container, or None if the container has no labels'''
+    container = cli.inspect_container(id)
+    ip=container['NetworkSettings']['IPAddress']
+    cname=container['Name'][1:]
+    if not 'Labels' in container['Config']: return None
+    labels=container['Config']['Labels']
+
+    if "dns.hostname" in labels:
+        name=labels["dns.hostname"]
+        return name
 
 def collect_host_tuple(id):
     '''Return information about a specific container, or None if the container has no labels'''
@@ -45,9 +64,9 @@ def collect_host_tuple(id):
                 (host_port, container_port) = s
             else:
                 (host_port, container_port) = (p, p)
-            return (name, host_port, ip, container_port, cname)
+            return Record(expand_hostname(name), host_port, ip, container_port, cname)
         if not "proxy.ports" in labels:
-            return [(name, "80", ip, "80", cname)]
+            return [Record(expand_hostname(name), "80", ip, "80", cname)]
 
         ports = labels["proxy.ports"].split()
         r = map(port, ports)
@@ -72,6 +91,8 @@ def listen(file, ports):
 
 def server(file, tuples):
     for t in tuples:
+        name=" ".join([t[0],
+                      t[0].split('.',1)[0]])
         print >> file,  '''
 server {{
   listen  {host_port};
@@ -87,23 +108,30 @@ server {{
    }}
 }}
 
-'''.format(name=t[0], host_port=t[1], upstream=to_token("{}:{}".format(t[0],t[1])))
+'''.format(name=name, host_port=t[1], upstream=to_token("{}:{}".format(t[0],t[1])))
 
 def to_token(name):
     regexp = re.compile("[^a-zA-Z0-9_]")
     return regexp.sub("_", name)
 
+def expand_hostname(name):
+    '''Expand hostname by adding DOMAIN unless hostname is already FQDN'''
+    if name.count('.') > 1:
+        return name
+    elif DOMAIN:
+        return name + "." + os.environ['DOMAIN']
+    else:
+        return name
 
 def generate(file, forward):
 
     upstream(file,
-        [("{}:{}".format(x[0],x[1]), "{}:{}".format(x[2],x[3]), x[4]) for x in forward]
+        [("{}:{}".format(x.hostname,x.port), "{}:{}".format(x.container_ip,x.container_port), x.container_name) for x in forward]
         )
 
-    listen(file, set([x[1] for x in forward]))
+    listen(file, set([x.port for x in forward]))
 
-
-    servers = set([(x[0], x[1]) for x in forward])
+    servers = set([(x.hostname, x.port) for x in forward])
 
     server(file, servers)
 
@@ -112,7 +140,7 @@ def generate_html(file, forward):
     seen=dict()
 
     def out(x):
-        text = "{}:{}".format(x[0],x[1])
+        text = "{}:{}".format(x.hostname,x.port)
         if text in seen: return
         print >> file, '<li><a href="{url}">{title}</a></li>'.format(url="http://{}".format(text),
                                                                      title=text)
@@ -145,7 +173,7 @@ def collect_from_environment(containers):
                 container = cli.inspect_container(byname[cname]['Id'])
                 container_ip = container['NetworkSettings']['IPAddress']
                 hostname = "{}.{}".format(k[2:], domain)
-                l.append( (hostname,
+                l.append( Record(hostname,
                            "80",
                            container_ip,
                            container_port,
@@ -291,6 +319,7 @@ def main():
     ids = container_ids(containers)
 
     forward=collect_host_tuples(ids)
+
     forward.extend(collect_from_environment(containers)) 
     forward.sort(key=lambda x: (x[0], x[1]))
 
@@ -305,7 +334,11 @@ def main():
 
     if args.route53:
         ip=get_host_ip(args)
-        update_route53(args, [x[0] for x in forward], ip)
+        proxy_names = [x[0] for x in forward]
+        route53_names = filter(None, map(collect_nonproxy_hosts, ids))
+
+        print "Adding proxy names {} and route53 names {}".format(proxy_names, route53_names)
+        update_route53(args, proxy_names + route53_names, ip)
 
 if __name__ == "__main__":
     main()

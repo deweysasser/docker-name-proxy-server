@@ -18,7 +18,7 @@ ADD events.sh /root/watch
 ADD build-proxy-config.py /root/
 RUN mkdir -p /etc/proxy
 ENTRYPOINT ["/root/watch"]
-ENV DOMAIN=example.com
+ENV DOMAIN=
 VOLUME /etc/nginx/conf.d
 VOLUME /usr/share/nginx/html
 

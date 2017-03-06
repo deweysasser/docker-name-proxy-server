@@ -1,8 +1,10 @@
 # Name based proxy server
 
-This image is a named based proxy server.  By defining appropriate
-labels on docker containers, you can have it do host name based
-mapping to foward to different containers.
+Multiplex multiple docker web server containers through a single IP,
+distinguished by hostname defines by labels on docker containers.
+
+Also, in conjunction with the above or independently, set Route 53
+host entries according to the hostnames.
 
 The design point is to multiplex a single port 80 to different
 back-end containers.
@@ -15,6 +17,11 @@ why I wrote this.
 
 This tool can additionally update Route 53 host names with the IP of
 the current host or instance.
+
+Because you run containers where hostname mapping is desirable but you
+cannot proxy the protocol through NGINX, this container also updates
+Route53 based on different labels which are independent of the proxy
+hostnames.
 
 ## Usage
 
@@ -147,6 +154,14 @@ update Route53:
              }
          ]
      }
+
+### Configuring DNS entries independent of proxies
+
+If you have a container which NGINX cannot proxy, instead of using the
+'proxy.host' label, you can use 'dns.hostname'.  If this update
+container is run with "--route53", all values of "dns.hostname" will
+be collected and pushed into route53 the same as the values of
+"proxy.host".
 
 
 ## Load Balancing
