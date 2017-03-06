@@ -1,11 +1,11 @@
 upstream host3_example_com_80 { 
   ip_hash;
-   server 0.0.0.0:80; # bbox4
+   server 0.0.0.0:80; # nginx-host3
 }
 
 upstream host4_foobar_com_80 { 
   ip_hash;
-   server 0.0.0.0:80; # bbox5
+   server 0.0.0.0:80; # nginx-host4.foobar.com
 }
 
 

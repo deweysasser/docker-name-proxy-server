@@ -64,9 +64,9 @@ def collect_host_tuple(id):
                 (host_port, container_port) = s
             else:
                 (host_port, container_port) = (p, p)
-            return Record(name, host_port, ip, container_port, cname)
+            return Record(expand_hostname(name), host_port, ip, container_port, cname)
         if not "proxy.ports" in labels:
-            return [Record(name, "80", ip, "80", cname)]
+            return [Record(expand_hostname(name), "80", ip, "80", cname)]
 
         ports = labels["proxy.ports"].split()
         r = map(port, ports)
@@ -124,12 +124,12 @@ def expand_hostname(name):
 def generate(file, forward):
 
     upstream(file,
-        [("{}:{}".format(expand_hostname(x.hostname),x.port), "{}:{}".format(x.container_ip,x.container_port), x.container_name) for x in forward]
+        [("{}:{}".format(x.hostname,x.port), "{}:{}".format(x.container_ip,x.container_port), x.container_name) for x in forward]
         )
 
     listen(file, set([x.port for x in forward]))
 
-    servers = set([(expand_hostname(x.hostname), x.port) for x in forward])
+    servers = set([(x.hostname, x.port) for x in forward])
 
     server(file, servers)
 
