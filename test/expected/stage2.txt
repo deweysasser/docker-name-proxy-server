@@ -1,12 +1,10 @@
 upstream host1_80 { 
   ip_hash;
    server 0.0.0.0:80; # nginx-host1
-   server 0.0.0.0:80; # nginx-host1
 }
 
 upstream host2_80 { 
   ip_hash;
-   server 0.0.0.0:80; # nginx-host2
    server 0.0.0.0:80; # nginx-host2
 }
 
