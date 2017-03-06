@@ -91,6 +91,8 @@ def listen(file, ports):
 
 def server(file, tuples):
     for t in tuples:
+        name=" ".join([t[0],
+                      t[0].split('.',1)[0]])
         print >> file,  '''
 server {{
   listen  {host_port};
@@ -106,7 +108,7 @@ server {{
    }}
 }}
 
-'''.format(name=t[0], host_port=t[1], upstream=to_token("{}:{}".format(t[0],t[1])))
+'''.format(name=name, host_port=t[1], upstream=to_token("{}:{}".format(t[0],t[1])))
 
 def to_token(name):
     regexp = re.compile("[^a-zA-Z0-9_]")

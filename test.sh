@@ -12,13 +12,22 @@ else
 fi
 
 cleanup() {
-    echo Cleaning Up
-    docker rm -f $cleanup >/dev/null
+    assert-success "Resetting containers" docker rm -f $cleanup
     cleanup=""
 }
 
+pause() {
+    echo 'Pausing'
+    read
+}
+
+fail() {
+    failed=$(($failed + 1))
+#    pause
+}
+
 push() {
-    name="$1"
+    local name="$1"
     shift
     eval "$name=\"\${$name} $*\""
 }
@@ -46,7 +55,23 @@ assert-success() {
     else
 	echo FAIL
 	cat $results
-	failed=$(($failed + 1))
+	fail
+    fi
+}
+
+assert-failure() {
+    name="$1" ; shift
+    dir=$(echo $name | tr ' ' _)
+    results="test/results/$dir.txt"
+
+    echo -n "$name..."
+    "$@" 2>&1 > $results
+    if [ $? -ne 0 ] ; then
+	echo PASS
+    else
+	echo FAIL
+	cat $results
+	fail
     fi
 }
 
@@ -63,7 +88,58 @@ assert-equal() {
     else
 	echo FAIL
 	echo "  expected [$expected], got [$result]"
-	failed=$(($failed + 1))
+	fail
+    fi
+}
+
+assert-not-equal() {
+    name="$1"; shift
+    expected="$1"; shift
+
+    echo -n "$name..."
+
+    result=$("$@")
+
+    if [ "$expected" != "$result" ]; then
+	echo PASS
+    else
+	echo FAIL
+	echo "  expected [$expected], got [$result]"
+	fail
+    fi
+}
+
+assert-contains() {
+    name="$1"; shift
+    expected="$1"; shift
+
+    echo -n "$name..."
+
+    result=$("$@")
+
+    if echo "$result" | grep -q "$expected"; then
+	echo PASS
+    else
+	echo FAIL
+	echo "  expected [$expected] in [$result]"
+	fail
+    fi
+}
+
+assert-not-contains() {
+    name="$1"; shift
+    expected="$1"; shift
+
+    echo -n "$name..."
+
+    result=$("$@")
+
+    if ! echo "$result" | grep -q "$expected"; then
+	echo PASS
+    else
+	echo FAIL
+	echo "  expected [$expected] in [$result]"
+	fail
     fi
 }
 
@@ -72,30 +148,27 @@ nginx() {
 }
 
 
-echo "Running hosting targets"
 nginx host1
 nginx host2
 
-echo "Running updater"
 push cleanup updater-$$
-docker run -d --name updater-$$ -v /var/run/docker.sock:/var/run/docker.sock name-based-proxy > /dev/null
+assert-success "Running Update Process" docker run -d --name updater-$$ -v /var/run/docker.sock:/var/run/docker.sock name-based-proxy 
 
-sleep 2
+sleep 3
 
 docker exec updater-$$ cat /etc/nginx/conf.d/proxy.conf | normalize > test/output/stage1.txt
-assert-success "Test Startup" diff test/{output,expected}/stage1.txt 
+assert-success "Test Startup config" diff test/{output,expected}/stage1.txt 
 
 nginx host3
 
 docker exec updater-$$ cat /etc/nginx/conf.d/proxy.conf | normalize > test/output/stage2.txt
-assert-success "Test Dynamic Pickup" diff test/{output,expected}/stage2.txt
+assert-success "Test Dynamic config" diff test/{output,expected}/stage2.txt
 
 
 cleanup
 
-echo "Running updater with DOMAIN=example.com"
 push cleanup updater-$$
-docker run -d --name updater-$$ -e DOMAIN=example.com -v /var/run/docker.sock:/var/run/docker.sock name-based-proxy > /dev/null
+assert-success "Running Updater with Domain" docker run -d --name updater-$$ -e DOMAIN=example.com -v /var/run/docker.sock:/var/run/docker.sock name-based-proxy 
 
 sleep 1
 
@@ -107,16 +180,22 @@ sleep 1
 docker exec updater-$$ cat /etc/nginx/conf.d/proxy.conf | normalize > test/output/stage3.txt
 assert-success "Test With Domain" diff test/{output,expected}/stage3.txt
 
-echo "Starting up nginx" 
 push cleanup nginx-$$
-docker run -d --volumes-from updater-$$ --name nginx-$$ -P nginx > /dev/null
+assert-success "Starting proxy service" docker run -d --volumes-from updater-$$ --name nginx-$$ -P nginx > /dev/null
 
 port=$(docker port nginx-$$ 80 | awk -F: '{print $2}')
 
-echo Address is $HOSTIP:$port
 
-assert-equal "Correct host3" host3 curl -s -H "Host: host3" $HOSTIP:$port
-assert-equal "Correct host4 by long name" host4.foobar.com curl -s -H "Host: host4.foobar.com" $HOSTIP:$port
-#assert-equal "Correct host by short name" host4.foobar.com curl -s -H "Host: host4" $HOSTIP:$port
+assert-equal "Correct host3/short" host3 curl -s -H "Host: host3" $HOSTIP:$port
+#assert-contains "Host List" "li" curl -s -H "Host: missing" $HOSTIP:$port
+assert-not-equal "Do not find missing host" missing curl -s -H "Host: missing" $HOSTIP:$port
+assert-equal "Correct host3/long" host3 curl -s -H "Host: host3.example.com" $HOSTIP:$port
+assert-equal "Correct host4/long" host4.foobar.com curl -s -H "Host: host4.foobar.com" $HOSTIP:$port
+assert-equal "Correct host4/short" host4.foobar.com curl -s -H "Host: host4" $HOSTIP:$port
+
+#echo Address is $HOSTIP:$port
+#pause
+
+
 
 exit $failed

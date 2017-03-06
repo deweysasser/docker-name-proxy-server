@@ -1,17 +1,19 @@
 upstream host1_80 { 
   ip_hash;
    server 0.0.0.0:80; # nginx-host1
+   server 0.0.0.0:80; # nginx-host1
 }
 
 upstream host2_80 { 
   ip_hash;
+   server 0.0.0.0:80; # nginx-host2
    server 0.0.0.0:80; # nginx-host2
 }
 
 
 server {
   listen  80;
-  server_name host1;
+  server_name host1 host1;
 
   location / {
       proxy_pass http://host1_80;
@@ -27,7 +29,7 @@ server {
 
 server {
   listen  80;
-  server_name host2;
+  server_name host2 host2;
 
   location / {
       proxy_pass http://host2_80;
