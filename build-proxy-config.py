@@ -115,6 +115,21 @@ server {{
 
 '''.format(name=names, host_port=t[1], upstream=to_token("{}:{}".format(t[0],t[1])))
 
+def default_server(file, ports):
+    for p in ports:
+        print >> file,  '''
+server {{
+  listen  {host_port};
+  server_name _;
+
+  location / {{
+      root /usr/share/nginx/html;
+   }}
+}}
+
+'''.format(host_port=p)
+
+
 def to_token(name):
     regexp = re.compile("[^a-zA-Z0-9_]")
     return regexp.sub("_", name)
@@ -134,7 +149,10 @@ def generate(file, forward):
         [("{}:{}".format(x.hostname,x.port), "{}:{}".format(x.container_ip,x.container_port), x.container_name) for x in forward]
         )
 
-    listen(file, set([x.port for x in forward]))
+    ports = set([x.port for x in forward])
+#    listen(file, ports)
+
+    default_server(file, ports)
 
     servers = set([(x.hostname, x.port) for x in forward])
 

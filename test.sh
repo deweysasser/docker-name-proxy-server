@@ -187,7 +187,7 @@ port=$(docker port nginx-$$ 80 | awk -F: '{print $2}')
 
 
 assert-equal "Correct host3/short" host3 curl -s -H "Host: host3" $HOSTIP:$port
-#assert-contains "Host List" "li" curl -s -H "Host: missing" $HOSTIP:$port
+assert-contains "Host List" "href" curl -s -H "Host: missing" $HOSTIP:$port
 assert-not-equal "Do not find missing host" missing curl -s -H "Host: missing" $HOSTIP:$port
 assert-equal "Correct host3/long" host3 curl -s -H "Host: host3.example.com" $HOSTIP:$port
 assert-equal "Correct host4/long" host4.foobar.com curl -s -H "Host: host4.foobar.com" $HOSTIP:$port
