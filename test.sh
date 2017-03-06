@@ -23,7 +23,7 @@ push() {
     eval "$name=\"\${$name} $*\""
 }
 
-run() {
+drun() {
     name="$1-$$"
     shift
     docker run --name $name "$@" >/dev/nul
@@ -34,7 +34,7 @@ normalize() {
     sed -e 's/\(nginx.*\)-[0-9]*/\1/g' -e 's/[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/0.0.0.0/g'
 }
 
-dotest() {
+assert-success() {
     name="$1" ; shift
     dir=$(echo $name | tr ' ' _)
     results="test/results/$dir.txt"
@@ -50,8 +50,25 @@ dotest() {
     fi
 }
 
+assert-equal() {
+    name="$1"; shift
+    expected="$1"; shift
+
+    echo -n "$name..."
+
+    result=$("$@")
+
+    if [ "$expected" == "$result" ]; then
+	echo PASS
+    else
+	echo FAIL
+	echo "  expected [$expected], got [$result]"
+	failed=$(($failed + 1))
+    fi
+}
+
 nginx() {
-    run nginx-$(echo $1 | tr ' ' _) -d --label proxy.host=$1 nginx bash -c "echo $1 > /usr/local/nginx/html/index.html; nginx -g \"daemon off;\""
+    drun nginx-$(echo $1 | tr ' ' _) -d --label proxy.host=$1 nginx bash -c "echo $1 > /usr/share/nginx/html/index.html; nginx -g \"daemon off;\""
 }
 
 
@@ -66,12 +83,12 @@ docker run -d --name updater-$$ -v /var/run/docker.sock:/var/run/docker.sock nam
 sleep 2
 
 docker exec updater-$$ cat /etc/nginx/conf.d/proxy.conf | normalize > test/output/stage1.txt
-dotest "Test Startup" diff test/{output,expected}/stage1.txt 
+assert-success "Test Startup" diff test/{output,expected}/stage1.txt 
 
 nginx host3
 
 docker exec updater-$$ cat /etc/nginx/conf.d/proxy.conf | normalize > test/output/stage2.txt
-dotest "Test Dynamic Pickup" diff test/{output,expected}/stage2.txt
+assert-success "Test Dynamic Pickup" diff test/{output,expected}/stage2.txt
 
 
 cleanup
@@ -88,7 +105,7 @@ nginx host4.foobar.com
 sleep 1
 
 docker exec updater-$$ cat /etc/nginx/conf.d/proxy.conf | normalize > test/output/stage3.txt
-dotest "Test With Domain" diff test/{output,expected}/stage3.txt
+assert-success "Test With Domain" diff test/{output,expected}/stage3.txt
 
 echo "Starting up nginx" 
 push cleanup nginx-$$
@@ -97,5 +114,9 @@ docker run -d --volumes-from updater-$$ --name nginx-$$ -P nginx > /dev/null
 port=$(docker port nginx-$$ 80 | awk -F: '{print $2}')
 
 echo Address is $HOSTIP:$port
+
+assert-equal "Correct host3" host3 curl -s -H "Host: host3" $HOSTIP:$port
+assert-equal "Correct host4 by long name" host4.foobar.com curl -s -H "Host: host4.foobar.com" $HOSTIP:$port
+#assert-equal "Correct host by short name" host4.foobar.com curl -s -H "Host: host4" $HOSTIP:$port
 
 exit $failed
