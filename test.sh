@@ -64,4 +64,20 @@ docker exec updater-$$ cat /etc/nginx/conf.d/proxy.conf | normalize > test/outpu
 dotest "Test Dynamic Pickup" diff test/{output,expected}/stage2.txt
 
 
+cleanup
+
+echo "Running updater with DOMAIN=example.com"
+docker run -d --name updater-$$ -e DOMAIN=example.com -v /var/run/docker.sock:/var/run/docker.sock name-based-proxy > /dev/null
+push cleanup updater-$$
+
+sleep 1
+
+run bbox4 -d --label proxy.host=host3 busybox sleep 1d
+run bbox5 -d --label proxy.host=host4.foobar.com busybox sleep 1d
+
+sleep 1
+
+docker exec updater-$$ cat /etc/nginx/conf.d/proxy.conf | normalize > test/output/stage3.txt
+dotest "Test With Domain" diff test/{output,expected}/stage3.txt
+
 exit $failed

@@ -12,6 +12,11 @@ import collections
 
 Record=collections.namedtuple('Record', 'hostname, port, container_ip, container_port, container_name')
 
+if 'DOMAIN' in os.environ:
+    DOMAIN=os.environ['DOMAIN']
+else:
+    DOMAIN=None
+
 
 if 'DOCKER_HOST' in os.environ:
     cli = docker.Client(base_url=os.environ['DOCKER_HOST'])
@@ -107,17 +112,24 @@ def to_token(name):
     regexp = re.compile("[^a-zA-Z0-9_]")
     return regexp.sub("_", name)
 
+def expand_hostname(name):
+    '''Expand hostname by adding DOMAIN unless hostname is already FQDN'''
+    if name.count('.') > 1:
+        return name
+    elif DOMAIN:
+        return name + "." + os.environ['DOMAIN']
+    else:
+        return name
 
 def generate(file, forward):
 
     upstream(file,
-        [("{}:{}".format(x.hostname,x.port), "{}:{}".format(x.container_ip,x.container_port), x.container_name) for x in forward]
+        [("{}:{}".format(expand_hostname(x.hostname),x.port), "{}:{}".format(x.container_ip,x.container_port), x.container_name) for x in forward]
         )
 
     listen(file, set([x.port for x in forward]))
 
-
-    servers = set([(x.hostname, x.port) for x in forward])
+    servers = set([(expand_hostname(x.hostname), x.port) for x in forward])
 
     server(file, servers)
 
