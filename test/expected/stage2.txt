@@ -23,6 +23,7 @@ server {
 server {
   listen  80;
   server_name host1;
+  client_max_body_size 100m;
 
   location / {
       proxy_pass http://host1_80;
@@ -39,6 +40,7 @@ server {
 server {
   listen  80;
   server_name host2;
+  client_max_body_size 100m;
 
   location / {
       proxy_pass http://host2_80;

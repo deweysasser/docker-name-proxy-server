@@ -17,6 +17,10 @@ if 'DOMAIN' in os.environ:
 else:
     DOMAIN=None
 
+if 'MAX_UPLOAD_SIZE' in os.environ:
+    MAX_UPLOAD_SIZE = os.environ['MAX_UPLOAD_SIZE']
+else:
+    MAX_UPLOAD_SIZE = '100m'
 
 if 'DOCKER_HOST' in os.environ:
     cli = docker.Client(base_url=os.environ['DOCKER_HOST'])
@@ -102,6 +106,7 @@ def server(file, tuples):
 server {{
   listen  {host_port};
   server_name {name};
+  client_max_body_size {max_size};
 
   location / {{
       proxy_pass http://{upstream};
@@ -113,7 +118,7 @@ server {{
    }}
 }}
 
-'''.format(name=names, host_port=t[1], upstream=to_token("{}:{}".format(t[0],t[1])))
+'''.format(name=names, host_port=t[1], max_size=MAX_UPLOAD_SIZE, upstream=to_token("{}:{}".format(t[0],t[1])))
 
 def default_server(file, ports):
     for p in ports:
@@ -332,6 +337,7 @@ def main():
     parser.add_argument("--secret", help="AWS secret to use", default=os.getenv('AWS_SECRET_ACCESS_KEY'))
     parser.add_argument("--aws-public-ip", action='store_true', help="Update Route 53 with public IP")
     parser.add_argument("--aws-local-ip", action='store_true', help="Update Route 53 with local IP")
+    parser.add_argument("--timeout", help="NGINX Proxy Timeout", default=30)
     
     parser.add_argument("--my-ip", help="Use the given IP instead of the discovered one")
 #    parser.add_argument("--public-ip-service", action='store_true', help="Use a public IP service (whatismyip.com) to determine public IP")
