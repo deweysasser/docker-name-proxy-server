@@ -217,7 +217,7 @@ def collect_notifications(containers):
     results=[]
 
     if "NOTIFY" in os.environ:
-        results.append((os.environ["NOTIFY"], "kill -HUP 1"))
+        results.append((os.environ["NOTIFY"], "/bin/kill -HUP 1"))
 
     for cid in containers:
         container = cli.inspect_container(cid)
@@ -227,7 +227,7 @@ def collect_notifications(containers):
         if "proxy.notify" in labels:
             cmd=labels['proxy.notify']
             if cmd is None or cmd == '':
-                results.append((cid, "kill -HUP 1"))
+                results.append((cid, "/bin/kill -HUP 1"))
             else:
                 results.append((cid, cmd))
 
