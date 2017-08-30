@@ -51,7 +51,7 @@ One way to do that is with the following docker-compose.yml file:
        ports:
          - "80:80"
        labels:
-         - proxy.notify
+         - proxy.notify=/etc/init.d/nginx reload
           
      updater:
        build: .
@@ -176,7 +176,20 @@ There is no connection draining on exit, so if you terminate a
 container subscribed to a given endpoint, the traffic will go to a
 different endpoint without regard to session state.
 
+## Short names vs FQDNs:  redirection vs direct service
 
+By default, the proxy is configured so that both the short
+(non-qualified names) and the long name are forwarded to the back-end
+server container.
+
+So, if you have a server with the `proxy.host` label
+`www.example.com`, both 'http://www.example.com' and 'http://www' will
+be directly forwarded to that container.
+
+If, instead, you run the container/script with the option
+`--redirect-shortnames`, instead of forwarding the request directly,
+the proxy will return a 301 permanent redirect of the short name to
+the long name.
 
 ## Legacy configuration via environment variables
 

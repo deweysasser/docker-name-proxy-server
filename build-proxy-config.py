@@ -93,15 +93,30 @@ def listen(file, ports):
 #        print >> file,  "  listen {};".format(p)
 #        print >> file,  "}"
 
-def server(file, tuples):
+def generate_server_redirect(file, from_name, to_name, host_port=80):
+    '''Generate a server block listening for requests to from_name and redirect them to to-name'''
+    print >> file, '''
+server {{
+  listen  {host_port};
+  server_name {from_name};
+  rewrite ^/(.*)$ http://{to_name}/$1 permanent;
+}}
+
+'''.format(from_name=from_name, to_name=to_name, host_port=host_port)
+
+
+def server(file, tuples, redirect_shortnames=False):
     for t in tuples:
         shortname=t[0].split('.',1)[0]
         name=t[0]
+        host_port=t[1]
 
+        names = name
         if name != shortname:
-            names = " ".join([name, shortname])
-        else:
-            names = name
+            if redirect_shortnames:
+                generate_server_redirect(file, shortname, name, host_port=host_port)
+            else:
+                names = " ".join([name, shortname])
         print >> file,  '''
 server {{
   listen  {host_port};
@@ -118,7 +133,7 @@ server {{
    }}
 }}
 
-'''.format(name=names, host_port=t[1], max_size=MAX_UPLOAD_SIZE, upstream=to_token("{}:{}".format(t[0],t[1])))
+'''.format(name=names, host_port=host_port, max_size=MAX_UPLOAD_SIZE, upstream=to_token("{}:{}".format(t[0],t[1])))
 
 def default_server(file, ports):
     for p in ports:
@@ -148,7 +163,7 @@ def expand_hostname(name):
     else:
         return name
 
-def generate(file, forward):
+def generate(file, forward, redirect_shortnames=False):
 
     upstream(file,
         [("{}:{}".format(x.hostname,x.port), "{}:{}".format(x.container_ip,x.container_port), x.container_name) for x in forward]
@@ -161,7 +176,7 @@ def generate(file, forward):
 
     servers = set([(x.hostname, x.port) for x in forward])
 
-    server(file, servers)
+    server(file, servers, redirect_shortnames=redirect_shortnames)
 
 def generate_html(file, forward):
     '''Generate the HTML file which is displayed when no valid name is given'''
@@ -338,6 +353,7 @@ def main():
     parser.add_argument("--aws-public-ip", action='store_true', help="Update Route 53 with public IP")
     parser.add_argument("--aws-local-ip", action='store_true', help="Update Route 53 with local IP")
     parser.add_argument("--timeout", help="NGINX Proxy Timeout", default=30)
+    parser.add_argument("--redirect-shortnames", help="Redirect short names to the full names instead of just answering for them", action='store_true')
     
     parser.add_argument("--my-ip", help="Use the given IP instead of the discovered one")
 #    parser.add_argument("--public-ip-service", action='store_true', help="Use a public IP service (whatismyip.com) to determine public IP")
@@ -353,7 +369,7 @@ def main():
     forward.sort(key=lambda x: (x.hostname, x.port))
 
     with open("/etc/nginx/conf.d/proxy.conf", "w") as f:
-        generate(f, forward)
+        generate(f, forward, redirect_shortnames=args.redirect_shortnames)
 
     with open("/usr/share/nginx/html/index.html", "w") as f:
         generate_html(f, forward)
