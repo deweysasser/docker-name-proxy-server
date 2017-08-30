@@ -7,12 +7,12 @@
 # Pull base image.
 FROM debian:jessie
 
-RUN apt-get update && apt-get -y install curl python
-RUN curl https://get.docker.com | bash
-
-RUN apt-get -y install python-pip
-RUN pip install boto3
-RUN pip install docker-py
+RUN apt-get update && \
+    apt-get -y install curl python && \
+    curl https://get.docker.com | bash && \
+    apt-get -y install python-pip && \
+    pip install boto3 && \
+    pip install docker-py
 
 ADD events.sh /root/watch
 ADD build-proxy-config.py /root/
