@@ -71,7 +71,7 @@ class TestBasic(ProxyTestCase):
         self.nginx("host1")
         self.nginx("host2")
         updater = self.drun("name-based-proxy", name="updater", volumes={"/var/run/docker.sock":"/var/run/docker.sock"})
-        time.sleep(3)
+        time.sleep(1)
         conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
         self.assertMatchesFile("test/expected/stage1.txt", conf)
 
@@ -87,33 +87,53 @@ class TestBasic(ProxyTestCase):
 
         self.nginx("host3")
         self.nginx("host4.foobar.com")
-        time.sleep(3)
+        time.sleep(1)
+
+        conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
+        self.assertMatchesFile("test/expected/stage3.txt", conf)
+
+
+class TestProxyContent(ProxyTestCase):
+    def setUp(self):
+        super(TestProxyContent, self).setUp()
+        updater = self.drun("name-based-proxy", name="updater", volumes={"/var/run/docker.sock":"/var/run/docker.sock"}, environment={'DOMAIN': 'example.com'})
+        time.sleep(1)
+
+        self.nginx("host3")
+        self.nginx("host4.foobar.com")
+        time.sleep(1)
 
         conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
         self.assertMatchesFile("test/expected/stage3.txt", conf)
 
         proxy = self.drun("nginx", name="proxy", volumes_from=[updater.id], publish_all_ports=True)
 
-        time.sleep(10)
+        time.sleep(1)
 
         port = self.getPort(proxy, 80)
 
-        remote="http://{}:{}".format(host_ip(), port)
+        self.remote="http://{}:{}".format(host_ip(), port)
 
-        def get(host):
-            r = requests.get(remote, headers={'Host': host})
-            return r.text.encode('ascii', 'ignore').strip()
+    def get(self, host):
+        r = requests.get(self.remote, headers={'Host': host})
+        return r.text.encode('ascii', 'ignore').strip()
+    
+    def test_short_short(self):
+        self.assertEqual('host3', self.get('host3'))
 
-        self.assertEqual('host3', get('host3.example.com'))
+    def test_short_long(self):
+        self.assertEqual('host3', self.get('host3.example.com'))
 
-        self.assertTrue("<ul>" in get('missing'))
+    def test_long_long(self):
+        self.assertEqual('host4.foobar.com', self.get('host4.foobar.com'))
 
-        self.assertFalse("missing" in get('missing'))
+    def test_long_short(self):
+        self.assertEqual('host4.foobar.com', self.get('host4'))
 
-        self.assertEqual('host3', get('host3.example.com'))
+    def test_missing(self):
+        content = self.get('missing')
+        self.assertTrue("<ul>" in content)
+        self.assertFalse("missing" in content)
 
-        self.assertEqual('host4.foobar.com', get('host4.foobar.com'))
-
-        self.assertEqual('host4.foobar.com', get('host4'))
 
 
