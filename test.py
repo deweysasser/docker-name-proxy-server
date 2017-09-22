@@ -94,21 +94,36 @@ class TestBasic(ProxyTestCase):
 
 
 class TestProxyContent(ProxyTestCase):
+    @classmethod
+    def setContainers(cls, containers):
+        cls._containers = containers
+
+    @classmethod
+    def tearDownClass(cls):
+        map(lambda x: x.remove(v=True, force=True), cls._containers)
+
+    def tearDown(self):
+        self.setContainers(self._containers)
+    
     def setUp(self):
-        super(TestProxyContent, self).setUp()
-        updater = self.drun("name-based-proxy", name="updater", volumes={"/var/run/docker.sock":"/var/run/docker.sock"}, environment={'DOMAIN': 'example.com'})
-        time.sleep(1)
+        # Only set up once
+        if not hasattr(self, '_containers'):
+            super(TestProxyContent, self).setUp()
+            updater = self.drun("name-based-proxy", name="updater", volumes={"/var/run/docker.sock":"/var/run/docker.sock"}, environment={'DOMAIN': 'example.com'})
+            time.sleep(1)
+            
+            self.nginx("host3")
+            self.nginx("host4.foobar.com")
+            time.sleep(1)
 
-        self.nginx("host3")
-        self.nginx("host4.foobar.com")
-        time.sleep(1)
+            conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
+            self.assertMatchesFile("test/expected/stage3.txt", conf)
 
-        conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
-        self.assertMatchesFile("test/expected/stage3.txt", conf)
+            proxy = self.drun("nginx", name="proxy", volumes_from=[updater.id], publish_all_ports=True)
 
-        proxy = self.drun("nginx", name="proxy", volumes_from=[updater.id], publish_all_ports=True)
-
-        time.sleep(1)
+            time.sleep(1)
+        else:
+            proxy = client.containers.get("proxy-{}".format(number))
 
         port = self.getPort(proxy, 80)
 
