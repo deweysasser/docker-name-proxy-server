@@ -1,4 +1,6 @@
+import os
 import unittest
+import requests
 import random
 import docker
 import time
@@ -11,6 +13,14 @@ client = docker.from_env()
 def normalize(string):
     return re.sub("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+", "0.0.0.0", re.sub("(nginx.*)-[0-9]+", "\\1", string))
 
+
+def host_ip():
+    host=os.environ['DOCKER_HOST']
+    
+    if host is not "":
+        return host.split(":")[0]
+    else:
+        return "127.0.0.1"
 
 class ProxyTestCase(unittest.TestCase):
     def setUp(self):
@@ -35,6 +45,13 @@ class ProxyTestCase(unittest.TestCase):
             c.kill()
             c.remove(v=True, force=True)
 
+    def getPort(self, container, port):
+        i = client.api.inspect_container(container.id)
+        ports =  i['NetworkSettings']['Ports']
+
+        key="{}/tcp".format(port)
+        
+        return ports[key][0]['HostPort']
 
     def assertMatchesFile(self, filename, string):
         try:
@@ -70,11 +87,33 @@ class TestBasic(ProxyTestCase):
 
         self.nginx("host3")
         self.nginx("host4.foobar.com")
-        time.sleep(1)
+        time.sleep(3)
 
         conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
         self.assertMatchesFile("test/expected/stage3.txt", conf)
 
         proxy = self.drun("nginx", name="proxy", volumes_from=[updater.id], publish_all_ports=True)
-        
+
+        time.sleep(10)
+
+        port = self.getPort(proxy, 80)
+
+        remote="http://{}:{}".format(host_ip(), port)
+
+        def get(host):
+            r = requests.get(remote, headers={'Host': host})
+            return r.text.encode('ascii', 'ignore').strip()
+
+        self.assertEqual('host3', get('host3.example.com'))
+
+        self.assertTrue("<ul>" in get('missing'))
+
+        self.assertFalse("missing" in get('missing'))
+
+        self.assertEqual('host3', get('host3.example.com'))
+
+        self.assertEqual('host4.foobar.com', get('host4.foobar.com'))
+
+        self.assertEqual('host4.foobar.com', get('host4'))
+
 
