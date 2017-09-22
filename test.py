@@ -26,7 +26,8 @@ class ProxyTestCase(unittest.TestCase):
         return c
 
     def nginx(self, hostname):
-        name="nginx-{hostname}".format(hostname=re.sub("[^a-zA-Z0-9]", "_", hostname))
+#        name="nginx-{hostname}".format(hostname=re.sub("[^a-zA-Z0-9]", "_", hostname))
+        name="nginx-{hostname}".format(hostname=hostname.replace(' ', '_'))
         return self.drun("nginx", name=name, command="bash -c 'echo {hostname} > /usr/share/nginx/html/index.html; nginx -g \"daemon off;\"'".format(hostname=hostname), labels={"proxy.host": hostname})
 
     def tearDown(self):
@@ -36,15 +37,20 @@ class ProxyTestCase(unittest.TestCase):
 
 
     def assertMatchesFile(self, filename, string):
-        with open(filename) as f:
-            contents=f.read()
-            self.assertEquals(contents, string)
+        try:
+            with open(filename) as f:
+                contents=f.read()
+                self.assertEquals(contents, string)
+        except AssertionError:
+            target = filename.replace("expected", "output")
+            with open(target, "w") as f:
+                print >> f, string
+            raise AssertionError("diff {} {}".format(filename, target))
             
 
 
 class TestBasic(ProxyTestCase):
-    def test_basic(self):
-        '''Testing something'''
+    def test_basic_config(self):
         self.nginx("host1")
         self.nginx("host2")
         updater = self.drun("name-based-proxy", name="updater", volumes={"/var/run/docker.sock":"/var/run/docker.sock"})
@@ -52,7 +58,23 @@ class TestBasic(ProxyTestCase):
         conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
         self.assertMatchesFile("test/expected/stage1.txt", conf)
 
+        # Testing dynamic config
+        self.nginx("host3")
+        conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
+        self.assertMatchesFile("test/expected/stage2.txt", conf)
+    
+    def test_updater_with_domain(self):
 
+        updater = self.drun("name-based-proxy", name="updater", volumes={"/var/run/docker.sock":"/var/run/docker.sock"}, environment={'DOMAIN': 'example.com'})
+        time.sleep(1)
 
+        self.nginx("host3")
+        self.nginx("host4.foobar.com")
+        time.sleep(1)
+
+        conf = normalize(updater.exec_run("cat /etc/nginx/conf.d/proxy.conf"))
+        self.assertMatchesFile("test/expected/stage3.txt", conf)
+
+        proxy = self.drun("nginx", name="proxy", volumes_from=[updater.id], publish_all_ports=True)
         
 
