@@ -120,7 +120,7 @@ def server(file, tuples, redirect_shortnames=False, ssl=False):
 
         if ssl:
             ssl_text = '''listen 443 ssl;
-  include ssl/ssl.conf'''
+  include ssl/ssl.conf;'''
         else:
             ssl_text = ""
 
