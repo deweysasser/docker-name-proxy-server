@@ -140,7 +140,7 @@ server {{
 server {{
   listen  443;
   server_name {name};
-  include /ssl/ssl.conf
+  include ssl/ssl.conf
   client_max_body_size {max_size};
 
   location / {{
