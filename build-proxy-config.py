@@ -117,9 +117,17 @@ def server(file, tuples, redirect_shortnames=False, ssl=False):
                 generate_server_redirect(file, shortname, name, host_port=host_port)
             else:
                 names = " ".join([name, shortname])
+
+        if ssl:
+            ssl_text = '''listen 443 ssl;
+  include ssl/ssl.conf'''
+        else:
+            ssl_text = ""
+
         print >> file,  '''
 server {{
   listen  {host_port};
+  {ssl_text}
   server_name {name};
   client_max_body_size {max_size};
 
@@ -133,27 +141,8 @@ server {{
    }}
 }}
 
-'''.format(name=names, host_port=host_port, max_size=MAX_UPLOAD_SIZE, upstream=to_token("{}:{}".format(t[0],t[1])))
+'''.format(name=names, host_port=host_port, max_size=MAX_UPLOAD_SIZE, ssl_text=ssl_text, upstream=to_token("{}:{}".format(t[0],t[1])))
 
-        if ssl:
-            print >> file,  '''
-server {{
-  listen  443;
-  server_name {name};
-  include ssl/ssl.conf
-  client_max_body_size {max_size};
-
-  location / {{
-      proxy_pass http://{upstream};
-      proxy_redirect default;
-
-      proxy_set_header   Host             $host;
-      proxy_set_header   X-Real-IP        $remote_addr;
-      proxy_set_header   X-Forwarded-For  $proxy_add_x_forwarded_for;
-   }}
-}}
-
-'''.format(name=names, host_port=host_port, max_size=MAX_UPLOAD_SIZE, upstream=to_token("{}:{}".format(t[0],t[1])))
 
 def default_server(file, ports):
     for p in ports:
