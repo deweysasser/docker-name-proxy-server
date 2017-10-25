@@ -1,18 +1,7 @@
-#
-# Nginx Dockerfile
-#
-# https://github.com/dockerfile/nginx
-#
+FROM python:2.7
 
-# Pull base image.
-FROM debian:jessie
-
-RUN apt-get update && \
-    apt-get -y install curl python && \
-    curl https://get.docker.com | bash && \
-    apt-get -y install python-pip && \
-    pip install boto3 && \
-    pip install docker-py
+RUN wget -q -O - https://get.docker.com | bash 
+RUN pip install boto3 docker-py
 
 ADD events.sh /root/watch
 ADD build-proxy-config.py /root/
