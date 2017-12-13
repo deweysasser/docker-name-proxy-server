@@ -287,10 +287,15 @@ def get_host_ip(args):
         raise Exception("Can't get IP")
     return ip
 
-def get_zone_id(client, domain):
+def get_zone_id(args, client, domain):
     '''Return the Route 53 zone id for the given 'domain'
     '''
+
+
     response = client.list_hosted_zones()
+
+    if args.zone_id:
+        return args.zone_id
     
     name=domain
     if not name.endswith("."):
@@ -321,7 +326,7 @@ def update_route53(args, names, ip):
     for name in names:
         try:
             hostname, domain = name.split(".", 1)
-            zone_id = get_zone_id(client, domain)
+            zone_id = get_zone_id(args, client, domain)
 
             if zone_id:
                 print "Updating %s to %s in zone %s" % (name, ip, zone_id)
@@ -357,6 +362,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--route53", action='store_true', help="True if we should update Route 53")
+    parser.add_argument("--zone-id", help="ID of the Route53 zone to use")
     parser.add_argument("--key", help="AWS key to use", default=os.getenv('AWS_ACCESS_KEY_ID'))
     parser.add_argument("--secret", help="AWS secret to use", default=os.getenv('AWS_SECRET_ACCESS_KEY'))
     parser.add_argument("--aws-public-ip", action='store_true', help="Update Route 53 with public IP")
