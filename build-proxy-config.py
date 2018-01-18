@@ -273,13 +273,19 @@ def get_host_ip(args):
 
        if no IP can be found or the web call fails, the method will raise an exception'''
 
+    # in the case of AWS instances, we want to bypass any proxy
+    # involved because we want to get the actual meta-data as seen
+    # from the current instance.
+
+    proxy_handler = urllib2.ProxyHandler({})
+    opener = urllib2.build_opener(proxy_handler)
 
     if args.my_ip is not None:
         ip = args.my_ip
     elif args.aws_public_ip:
-        ip = urllib2.urlopen("http://169.254.169.254/latest/meta-data/public-ipv4").read()
+        ip = opener.open("http://169.254.169.254/latest/meta-data/public-ipv4").read()
     elif args.aws_local_ip:
-        ip = urllib2.urlopen("http://169.254.169.254/latest/meta-data/local-ipv4").read()
+        ip = opener.open("http://169.254.169.254/latest/meta-data/local-ipv4").read()
     else:
         ip = urllib2.urlopen("http://ipv4bot.whatismyipaddress.com").read()
 
