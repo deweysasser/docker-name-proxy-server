@@ -1,3 +1,14 @@
+ARCHIVED
+========
+
+This project is no longer maintained.  
+
+The world has changed substantially since I wrote this.  I'm currently using [Traefik](https://traefik.io/) to fill this need.
+
+This should be considered deprecated.
+
+---
+
 # Name based proxy server
 
 Multiplex multiple docker web server containers through a single IP,
